@@ -377,6 +377,7 @@ class Qwen2Model(nn.Module):
         params_dict = dict(self.named_parameters(remove_duplicate=False))
         loaded_params: set[str] = set()
         for name, loaded_weight in weights:
+            name = name.replace("._checkpoint_wrapped_module", "")
             if "rotary_emb.inv_freq" in name:
                 continue
             if (self.quant_config is not None and
