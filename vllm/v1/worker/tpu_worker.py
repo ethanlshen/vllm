@@ -98,16 +98,13 @@ class TPUWorker:
         # MP runtime is initialized.
         self.profiler = None
         self.profile_dir = None
-        if envs.VLLM_TORCH_PROFILER_DIR and self.rank < 1:
+        if vllm_config.profiler_config.profiler == "torch" and self.rank < 1:
             # For TPU, we can only have 1 active profiler session for 1 profiler
             # server. So we only profile on rank0.
-            self.profile_dir = envs.VLLM_TORCH_PROFILER_DIR
+            self.profile_dir = vllm_config.profiler_config.torch_profiler_dir
             logger.info(
                 "Profiling enabled. Traces will be saved to: %s", self.profile_dir
             )
-
-        if self.model_config.seed is None:
-            self.model_config.seed = 0
 
     def initialize_cache(self, num_gpu_blocks: int, num_cpu_blocks: int) -> None:
         self.cache_config.num_gpu_blocks = num_gpu_blocks
@@ -141,8 +138,7 @@ class TPUWorker:
 
         # Set random seed.
         set_random_seed(self.model_config.seed)
-        if self.model_config.seed is not None:
-            xm.set_rng_state(self.model_config.seed, self.device)
+        xm.set_rng_state(self.model_config.seed, self.device)
 
         # Increase the cache size limit, which is the maximum number of
         # dynamo graphs that can be compiled.
@@ -332,7 +328,7 @@ class TPUWorker:
             world_size=parallel_config.world_size,
             rank=rank,
             local_rank=local_rank,
-            distributed_init_method=distributed_init_method,
+            distributed_init_method=distributed_init_method or "env://",
             backend=current_platform.dist_backend,
         )
         ensure_model_parallel_initialized(
@@ -350,6 +346,6 @@ class TPUWorker:
 
 
 if USE_TPU_INFERENCE:
-    from tpu_inference.worker import TPUWorker as TpuInferenceWorker
+    from tpu_inference.worker.tpu_worker import TPUWorker as TpuInferenceWorker
 
     TPUWorker = TpuInferenceWorker  # type: ignore
